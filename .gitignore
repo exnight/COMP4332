@@ -1,0 +1,16 @@
+# PyCharm
+.idea
+
+# LaTeX
+*.log
+*.aux
+*.synctex.gz
+
+# Jupyter
+.ipynb_checkpoints
+
+# Python Dev
+__pycache__
+
+# Custom
+.DS_Store
