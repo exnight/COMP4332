@@ -155,4 +155,4 @@ if __name__ == '__main__':
     sub_df = pd.DataFrame()
     sub_df["review_id"] = test_id_list
     sub_df["pred"] = test_pred
-    sub_df.to_csv("../build/pred.csv", index=False)
+    sub_df.to_csv("../build/dist/pred_base.csv", index=False)
