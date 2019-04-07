@@ -13,8 +13,8 @@ from tqdm import tqdm
 
 def get_neighbourhood_score(local_model, node1, node2):
     try:
-        vector1 = local_model.wv.syn0[local_model.wv.index2word.index(node1)]
-        vector2 = local_model.wv.syn0[local_model.wv.index2word.index(node2)]
+        vector1 = local_model.wv.vectors[local_model.wv.index2word.index(node1)]
+        vector2 = local_model.wv.vectors[local_model.wv.index2word.index(node2)]
         res = 1 - cosine(vector1, vector2)
     except ValueError:
         res = random()
@@ -64,8 +64,8 @@ def get_G_from_edges(edges):
 def load_edges(data):
     edges = []
     for i in range(data.shape[0]):
-        head = data.loc[i, 'head']
-        tail = data.loc[i, 'tail']
+        head = data.at[i, 'head']
+        tail = data.at[i, 'tail']
         edges.append((head, tail))
 
     return edges
@@ -97,9 +97,9 @@ valid_negative_edges = list()
 valid_data = pd.read_csv('data/valid.csv', index_col=0)
 
 for i in range(valid_data.shape[0]):
-    head = valid_data.loc[i, 'head']
-    tail = valid_data.loc[i, 'tail']
-    if valid_data.loc[i, 'label']:
+    head = valid_data.at[i, 'head']
+    tail = valid_data.at[i, 'tail']
+    if valid_data.at[i, 'label']:
         valid_positive_edges.append((head, tail))
     else:
         valid_negative_edges.append((head, tail))
@@ -123,7 +123,7 @@ walks = G.simulate_walks(num_walks, walk_length)
 model = Word2Vec(walks, size=dimension, window=window_size, min_count=0, sg=1, workers=num_workers, iter=iterations)
 resulted_embeddings = dict()
 for i, w in enumerate(model.wv.index2word):
-    resulted_embeddings[w] = model.wv.syn0[i]
+    resulted_embeddings[w] = model.wv.vectors[i]
 
 tmp_AUC_score = get_AUC(model, valid_positive_edges, valid_negative_edges)
 
