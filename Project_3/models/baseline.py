@@ -5,7 +5,7 @@ from keras.models import Model
 from keras.callbacks import ModelCheckpoint
 from sklearn.metrics import mean_squared_error
 
-STUDENT_ID = '23846183'
+STUDENT_ID = '20420684'
 
 
 # Function to calculate RMSE
@@ -54,6 +54,7 @@ if __name__ == "__main__":
     user_vocab = dict(zip(user_set, range(1, len(user_set) + 1)))
     user_vocab['unk'] = 0
     n_users = len(user_vocab)
+
     business_vocab = dict(zip(business_set, range(1, len(business_set) + 1)))
     business_vocab['unk'] = 0
     n_items = len(business_vocab)
@@ -61,20 +62,24 @@ if __name__ == "__main__":
     tr_users = tr_df.user_id.apply(lambda x: user_vocab[x] if x in user_vocab else 0).values
     tr_items = tr_df.business_id.apply(lambda x: business_vocab[x] if x in business_vocab else 0).values
     tr_ratings = tr_df.stars.values
+
     val_users = val_df.user_id.apply(lambda x: user_vocab[x] if x in user_vocab else 0).values
     val_items = val_df.business_id.apply(lambda x: business_vocab[x] if x in business_vocab else 0).values
     val_ratings = val_df.stars.values
+
     te_users = te_df.user_id.apply(lambda x: user_vocab[x] if x in user_vocab else 0).values
     te_items = te_df.business_id.apply(lambda x: business_vocab[x] if x in business_vocab else 0).values
 
     model = build_cfmodel(n_users, n_items, embed_size=50, output_layer='mlp')
 
     model.compile(optimizer='adam', loss='mse')
-    history = model.fit([tr_users, tr_items], tr_ratings, epochs=1, verbose=1, callbacks=[ModelCheckpoint('build/model.h5')])
+    history = model.fit([tr_users, tr_items], tr_ratings, epochs=1, verbose=1, callbacks=[ModelCheckpoint('build/baseline_model.h5')])
+
     y_pred = model.predict([tr_users, tr_items])
     print("TRAIN RMSE: ", rmse(y_pred, tr_ratings))
     y_pred = model.predict([val_users, val_items])
     print("VALID RMSE: ", rmse(y_pred, val_ratings))
+
     y_pred = model.predict([te_users, te_items])
     res_df = pd.DataFrame()
     res_df['pred'] = y_pred[:, 0]
