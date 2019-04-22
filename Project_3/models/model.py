@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import json
 
-import tensorflow
 from keras.layers import Input, Dense, Embedding
 from keras.layers import Concatenate, Reshape
 from keras.layers import LeakyReLU, BatchNormalization
@@ -18,19 +17,27 @@ from keras.callbacks import EarlyStopping, ModelCheckpoint
 from sklearn.metrics import mean_squared_error
 from sklearn.preprocessing import StandardScaler
 
+import tensorflow as tf
+# from keras.backend.tensorflow_backend import set_session
+# sess_config = tf.ConfigProto()
+# sess_config.gpu_options.per_process_gpu_memory_fraction = 0.4
+# set_session(tf.Session(config=sess_config))
+
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 random.seed(2019)
 np.random.seed(2019)
-tensorflow.set_random_seed(2019)
+tf.set_random_seed(2019)
 
 STUDENT_ID = '20420684'
 
 embed_size = 64
 deep_blocks = 3
-deep_units = 128
-fc_blocks = 5
+deep_units = 256
+fc_blocks = 4
 fc_units = 128
-lr = 0.0005
+lr = 0.00025
 epochs = 20
 batch_size = 64
 patience = int(epochs*0.2)
@@ -139,6 +146,13 @@ def get_wide_features(df):
     return np.concatenate((category_binary_features, category_corss_transform_features), axis=1)
 
 
+def count_elite(ele):
+    if ele == '':
+        return 0
+    else:
+        return len(ele.split(','))
+
+
 tr_df = pd.read_csv("data/train.csv")
 val_df = pd.read_csv("data/valid.csv")
 te_df = pd.read_csv("data/test.csv")
@@ -148,6 +162,33 @@ val_ratings = val_df.stars.values
 
 user_df = pd.read_json("data/user.json")
 item_df = pd.read_json("data/business.json")
+
+user_df['elite'] = user_df['elite'].apply(count_elite)
+
+attrs_list = pd.Series(['Alcohol', 'Caters', 'NoiseLevel', 'WiFi'])
+attr_cols = attrs_list.str.lower()
+
+for idx in range(item_df.shape[0]):
+    try:
+        attr = item_df.loc[idx, 'attributes']
+    except TypeError:
+        attr = "None"
+
+    for i in range(attrs_list.shape[0]):
+        attr_name = attrs_list[i]
+        attr_col = attr_cols[i]
+        if attr != "None":
+            try:
+                value = attr[attr_name]
+            except KeyError:
+                value = "Missing"
+            except TypeError:
+                value = "Missing"
+
+            item_df.at[idx, attr_col] = value
+        else:
+            item_df.at[idx, attr_col] = attr
+
 user_df = user_df.rename(index=str, columns={t: 'user_' + t for t in user_df.columns if t != 'user_id'})
 item_df = item_df.rename(index=str, columns={t: 'item_' + t for t in item_df.columns if t != 'business_id'})
 
@@ -161,7 +202,7 @@ te_df = pd.merge(pd.merge(te_df, user_df, on='user_id'), item_df, on='business_i
 
 # Continuous features
 print("Prepare continuous features...")
-continuous_columns = ["user_average_stars", "user_cool", "user_fans", "user_review_count", "user_useful", "user_funny", "item_is_open", "item_latitude", "item_longitude", "item_review_count", "item_stars"]
+continuous_columns = ["user_average_stars", "user_review_count", "user_useful", "item_is_open", "item_latitude", "item_longitude", "item_review_count", "item_stars"]
 tr_continuous_features = get_continuous_features(tr_df, continuous_columns)
 val_continuous_features = get_continuous_features(val_df, continuous_columns)
 te_continuous_features = get_continuous_features(te_df, continuous_columns)
@@ -173,7 +214,7 @@ te_continuous_features = scaler.transform(te_continuous_features)
 
 # Deep features
 print("Prepare deep features...")
-item_deep_columns = ["item_city", "item_postal_code", "item_state"]
+item_deep_columns = ["item_postal_code", "item_alcohol", "item_caters", "item_noiselevel", "item_wifi"]
 item_deep_vocab_lens = []
 for col_name in item_deep_columns:
     tmp = item_df[col_name].unique()
@@ -193,16 +234,16 @@ print("Prepare wide features...")
 # Prepare binary encoding for each selected categories
 all_categories = [category for category_list in item_df.item_categories.values for category in category_list.split(", ")]
 category_sorted = sorted(Counter(all_categories).items(), key=lambda x: x[1], reverse=True)
-selected_categories = [t[0] for t in category_sorted[:500]]
+selected_categories = [t[0] for t in category_sorted]
 selected_categories_to_idx = dict(zip(selected_categories, range(1, len(selected_categories) + 1)))
 selected_categories_to_idx['unk'] = 0
 idx_to_selected_categories = {val: key for key, val in selected_categories_to_idx.items()}
 
 # Prepare Cross transformation for each categories
 top_combinations = []
-top_combinations += get_top_k_p_combinations(tr_df, 2, 50, output_freq=False)
-top_combinations += get_top_k_p_combinations(tr_df, 3, 30, output_freq=False)
-top_combinations += get_top_k_p_combinations(tr_df, 4, 20, output_freq=False)
+top_combinations += get_top_k_p_combinations(tr_df, 2, 16, output_freq=False)
+top_combinations += get_top_k_p_combinations(tr_df, 3, 8, output_freq=False)
+top_combinations += get_top_k_p_combinations(tr_df, 4, 4, output_freq=False)
 top_combinations = [set(t) for t in top_combinations]
 
 tr_wide_features = get_wide_features(tr_df)
@@ -253,5 +294,5 @@ print("VALID RMSE: ", rmse(y_pred, val_ratings))
 y_pred = best_model.predict(te_features)
 res_df = pd.DataFrame()
 res_df['pred'] = y_pred[:, 0]
-res_df.to_csv("{}.csv".format(STUDENT_ID), index=False)
+res_df.to_csv("build/{}.csv".format(STUDENT_ID), index=False)
 print("Writing test predictions to file done.")
